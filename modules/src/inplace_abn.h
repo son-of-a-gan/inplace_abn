@@ -6,11 +6,14 @@
 
 std::vector<at::Tensor> mean_var_cpu(at::Tensor x);
 std::vector<at::Tensor> mean_var_cuda(at::Tensor x);
+std::vector<at::Tensor> mean_var_cuda_h(at::Tensor x);
 
 at::Tensor forward_cpu(at::Tensor x, at::Tensor mean, at::Tensor var, at::Tensor weight, at::Tensor bias,
                        bool affine, float eps);
 at::Tensor forward_cuda(at::Tensor x, at::Tensor mean, at::Tensor var, at::Tensor weight, at::Tensor bias,
                         bool affine, float eps);
+at::Tensor forward_cuda_h(at::Tensor x, at::Tensor mean, at::Tensor var, at::Tensor weight, at::Tensor bias,
+                          bool affine, float eps);
 
 std::vector<at::Tensor> edz_eydz_cpu(at::Tensor z, at::Tensor dz, at::Tensor weight, at::Tensor bias,
                                      bool affine, float eps);

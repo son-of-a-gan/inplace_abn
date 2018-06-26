@@ -8,6 +8,7 @@ setup(
             'modules/src/inplace_abn.cpp',
             'modules/src/inplace_abn_cpu.cpp',
             'modules/src/inplace_abn_cuda.cu',
+            'modules/src/inplace_abn_cuda_half.cu',
         ], extra_compile_args={'cxx': [],
                                'nvcc': ['--expt-extended-lambda']})
     ],

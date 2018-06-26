@@ -6,7 +6,11 @@
 
 std::vector<at::Tensor> mean_var(at::Tensor x) {
   if (x.is_cuda()) {
-    return mean_var_cuda(x);
+    if (x.type().scalarType() == at::ScalarType::Half) {
+      return mean_var_cuda_h(x);
+    } else {
+      return mean_var_cuda(x);
+    }
   } else {
     return mean_var_cpu(x);
   }
@@ -15,7 +19,11 @@ std::vector<at::Tensor> mean_var(at::Tensor x) {
 at::Tensor forward(at::Tensor x, at::Tensor mean, at::Tensor var, at::Tensor weight, at::Tensor bias,
                    bool affine, float eps) {
   if (x.is_cuda()) {
-    return forward_cuda(x, mean, var, weight, bias, affine, eps);
+    if (x.type().scalarType() == at::ScalarType::Half) {
+      return forward_cuda_h(x, mean, var, weight, bias, affine, eps);
+    } else {
+      return forward_cuda(x, mean, var, weight, bias, affine, eps);
+    }
   } else {
     return forward_cpu(x, mean, var, weight, bias, affine, eps);
   }

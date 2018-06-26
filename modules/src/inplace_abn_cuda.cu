@@ -8,20 +8,6 @@
 #include "common.h"
 #include "inplace_abn.h"
 
-// Checks
-#define CHECK_CUDA(x) AT_ASSERT(x.type().is_cuda(), #x " must be a CUDA tensor")
-#define CHECK_CONTIGUOUS(x) AT_ASSERT(x.is_contiguous(), #x " must be contiguous")
-#define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
-
-// Utilities
-void get_dims(at::Tensor x, int64_t& num, int64_t& chn, int64_t& sp) {
-  num = x.size(0);
-  chn = x.size(1);
-  sp = 1;
-  for (int64_t i = 2; i < x.ndimension(); ++i)
-    sp *= x.size(i);
-}
-
 // Operations for reduce
 template<typename T>
 struct SumOp {
