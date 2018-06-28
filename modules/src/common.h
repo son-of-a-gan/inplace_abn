@@ -78,7 +78,7 @@ static __device__ __forceinline__ Pair<T> warpSum(Pair<T> value) {
 }
 
 template <typename T, typename Op>
-__device__ T reduce(Op op, int plane, int N, int C, int S) {
+__device__ T reduce(Op op, int plane, int N, int S) {
   T sum = (T)0;
   for (int batch = 0; batch < N; ++batch) {
     for (int x = threadIdx.x; x < S; x += blockDim.x) {

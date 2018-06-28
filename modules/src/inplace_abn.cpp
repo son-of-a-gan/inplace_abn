@@ -32,7 +32,10 @@ at::Tensor forward(at::Tensor x, at::Tensor mean, at::Tensor var, at::Tensor wei
 std::vector<at::Tensor> edz_eydz(at::Tensor z, at::Tensor dz, at::Tensor weight, at::Tensor bias,
                                  bool affine, float eps) {
   if (z.is_cuda()) {
-    return edz_eydz_cuda(z, dz, weight, bias, affine, eps);
+    if (z.type().scalarType() == at::ScalarType::Half) 
+		return edz_eydz_cuda_h(z, dz, weight, bias, affine, eps);
+    else
+		return edz_eydz_cuda(z, dz, weight, bias, affine, eps);
   } else {
     return edz_eydz_cpu(z, dz, weight, bias, affine, eps);
   }
@@ -41,7 +44,10 @@ std::vector<at::Tensor> edz_eydz(at::Tensor z, at::Tensor dz, at::Tensor weight,
 std::vector<at::Tensor> backward(at::Tensor z, at::Tensor dz, at::Tensor var, at::Tensor weight, at::Tensor bias,
                                  at::Tensor edz, at::Tensor eydz, bool affine, float eps) {
   if (z.is_cuda()) {
-    return backward_cuda(z, dz, var, weight, bias, edz, eydz, affine, eps);
+    if (z.type().scalarType() == at::ScalarType::Half) 
+      return backward_cuda_h(z, dz, var, weight, bias, edz, eydz, affine, eps);
+	else
+      return backward_cuda(z, dz, var, weight, bias, edz, eydz, affine, eps);
   } else {
     return backward_cpu(z, dz, var, weight, bias, edz, eydz, affine, eps);
   }
@@ -53,7 +59,10 @@ void leaky_relu_forward(at::Tensor z, float slope) {
 
 void leaky_relu_backward(at::Tensor z, at::Tensor dz, float slope) {
   if (z.is_cuda()) {
-    return leaky_relu_backward_cuda(z, dz, slope);
+    if (z.type().scalarType() == at::ScalarType::Half) 
+      return leaky_relu_backward_cuda_h(z, dz, slope);
+	else
+      return leaky_relu_backward_cuda(z, dz, slope);
   } else {
     return leaky_relu_backward_cpu(z, dz, slope);
   }

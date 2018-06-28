@@ -61,9 +61,9 @@ __global__ void mean_var_kernel(const T *x, T *mean, T *var, int num, int chn, i
   int plane = blockIdx.x;
   T norm = T(1) / T(num * sp);
 
-  T _mean = reduce<T, SumOp<T>>(SumOp<T>(x, chn, sp), plane, num, chn, sp) * norm;
+  T _mean = reduce<T, SumOp<T>>(SumOp<T>(x, chn, sp), plane, num, sp) * norm;
   __syncthreads();
-  T _var = reduce<T, VarOp<T>>(VarOp<T>(_mean, x, chn, sp), plane, num, chn, sp) * norm;
+  T _var = reduce<T, VarOp<T>>(VarOp<T>(_mean, x, chn, sp), plane, num, sp) * norm;
 
   if (threadIdx.x == 0) {
     mean[plane] = _mean;
@@ -162,7 +162,7 @@ __global__ void edz_eydz_kernel(const T *z, const T *dz, const T *weight, const 
   T _weight = affine ? abs(weight[plane]) + eps : 1.f;
   T _bias = affine ? bias[plane] : 0.f;
 
-  Pair<T> res = reduce<Pair<T>, GradOp<T>>(GradOp<T>(_weight, _bias, z, dz, chn, sp), plane, num, chn, sp);
+  Pair<T> res = reduce<Pair<T>, GradOp<T>>(GradOp<T>(_weight, _bias, z, dz, chn, sp), plane, num, sp);
   __syncthreads();
 
   if (threadIdx.x == 0) {
