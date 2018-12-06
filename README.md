@@ -1,3 +1,30 @@
+# Uses in VE-GAN
+
+## Setup
+
+To setup and start using, please read the installation requirements at the bottom.
+
+To evaluate VE-GAN outputs, verify that there are 2 folders, for example where `folder_gt` consists of sharp ground truth images,
+while `folder_fake` consists of deblurred images corresponding to images in `folder_gt` with the same name,
+
+```
+<PATH>/folder_gt
+|--000000.jpg
+|--000001.jpg
+|--000002.jpg
+|-- ...
+
+<PATH>/folder_fake
+|--000000.jpg
+|--000001.jpg
+|--000002.jpg
+|-- ...
+```
+
+## Evaluatation of VE-GAN
+
+More instructions to come.
+
 # In-Place Activated BatchNorm
 
 [**In-Place Activated BatchNorm for Memory-Optimized Training of DNNs**](https://arxiv.org/abs/1712.02616)
