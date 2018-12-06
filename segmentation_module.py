@@ -8,12 +8,8 @@ import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.functional as functional
 from PIL import Image, ImagePalette
-from torch.utils.data import DataLoader
-from torch.utils.data.distributed import DistributedSampler
 
 import models
-from dataset.dataset import SegmentationDataset, segmentation_collate
-from dataset.transform import SegmentationTransform
 from modules.bn import InPlaceABN
 from modules.deeplab import DeeplabV3
 
