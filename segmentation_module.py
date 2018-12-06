@@ -91,6 +91,26 @@ class SegmentationModule(nn.Module):
         def output(self):
             return self.buffer_prob, self.buffer_cls
 
+    # currently only for batchsize 1
+    class _IOUMaxFusion:
+        def __init__(self, x, classes):
+            self.buffer_cls = x.new_zeros(
+                x.size(0), x.size(2), x.size(3), dtype=torch.long)
+            self.buffer_prob = x.new_zeros(x.size(0), x.size(2), x.size(3))
+            self.sem_logits = None
+
+        def update(self, sem_logits):
+            self.sem_logits = sem_logits
+            probs = functional.softmax(sem_logits, dim=1)
+            max_prob, max_cls = probs.max(1)
+
+            replace_idx = max_prob > self.buffer_prob
+            self.buffer_cls[replace_idx] = max_cls[replace_idx]
+            self.buffer_prob[replace_idx] = max_prob[replace_idx]
+
+        def output(self):
+            return self.buffer_prob, self.buffer_cls, self.sem_logits
+
     def __init__(self, body, head, head_channels, classes, fusion_mode="mean"):
         super(SegmentationModule, self).__init__()
         self.body = body
@@ -104,6 +124,8 @@ class SegmentationModule(nn.Module):
             self.fusion_cls = SegmentationModule._VotingFusion
         elif fusion_mode == "max":
             self.fusion_cls = SegmentationModule._MaxFusion
+        elif fusion_mode == "iou_max":
+            self.fusion_cls = SegmentationModule._IOUMaxFusion
 
     def _network(self, x, scale):
         if scale != 1:
@@ -129,6 +151,7 @@ class SegmentationModule(nn.Module):
             sem_logits = self._network(x, scale)
             sem_logits = functional.interpolate(
                 sem_logits, size=out_size, mode="bilinear", align_corners=False)
+
             fusion.update(sem_logits)
 
             # Flipped orientation
@@ -139,4 +162,4 @@ class SegmentationModule(nn.Module):
                     sem_logits, size=out_size, mode="bilinear", align_corners=False)
                 fusion.update(flip(sem_logits, -1))
 
-        return fusion.output()
+            return fusion.output()

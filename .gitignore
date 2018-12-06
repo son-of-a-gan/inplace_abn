@@ -1,5 +1,6 @@
 weights
 test_images
+results
 
 # Compiled Object files
 *.slo

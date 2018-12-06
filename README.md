@@ -21,9 +21,13 @@ while `folder_fake` consists of deblurred images corresponding to images in `fol
 |-- ...
 ```
 
+Download the pretrained weights from the link at the bottom for `wide_resnet38_deeplab_vistas`.
+
 ## Evaluatation of VE-GAN
 
-More instructions to come.
+```
+python eval_vegan.py --snapshot weights/wide_resnet38_deeplab_vistas.pth.tar --in-gt <PATH>/folder_gt --in-fake <PATH>/folder_fake --name <experiment_name>
+```
 
 # In-Place Activated BatchNorm
 

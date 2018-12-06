@@ -1,15 +1,48 @@
+import os
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as functional
 import torch.backends.cudnn as cudnn
 import argparse
-import tqdm
+from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from segmentation_module import SegmentationModule, load_snapshot, flip
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from dataset.dataset import VEGANSegmentationDataset, vegan_segmentation_collate
 from dataset.transform import SegmentationTransform
+from palette_module import get_pred_image
+
+
+def confusion_to_iou(confusion):
+    denom = confusion.sum(axis=1) + confusion.sum(axis=0) - \
+        np.diag(confusion).astype(np.float32)
+    numerator = np.diag(confusion).astype(np.float32)
+    # stop divide by zero!
+    numerator = numerator[denom != 0]
+    denom = denom[denom != 0]
+    iou = numerator / denom
+    return np.nanmean(iou)
+
+
+def save_palette_image(output_path, probs, preds, rec, gt=True):
+    # saving palettes
+    for i, (prob, pred) in enumerate(zip(torch.unbind(probs, dim=0), torch.unbind(preds, dim=0))):
+        out_size = rec["meta"][i]["size"]
+        img_name = rec["meta"][i]["idx"]
+
+        # Save prediction
+        prob = prob.cpu()
+        pred = pred.cpu()
+        pred_img = get_pred_image(pred, out_size, True)
+        if gt:
+            pred_img.save(os.path.join(output_path,
+                                       img_name + "_gt" + ".png"))
+        else:
+            pred_img.save(os.path.join(output_path,
+                                       img_name + "_fake" + ".png"))
 
 
 if __name__ == '__main__':
@@ -25,19 +58,19 @@ if __name__ == '__main__':
                         help="Path to output folder.")
     parser.add_argument("--name", type=str, default="ganisgood",
                         help="Experiment folder name to be used in output folder.")
+    parser.add_argument("--fusion-mode", metavar="NAME", type=str, choices=["mean", "voting", "max", "iou_max"], default="iou_max",
+                        help="How to fuse the outputs. Options: 'mean', 'voting', 'max', 'iou_max'")
+    parser.add_argument("--scales", metavar="LIST", type=str,
+                        default="[1]", help="List of scales")
     # minimally needed
     parser.add_argument("--rank", metavar="RANK",
                         type=int, default=0, help="GPU id")
-    parser.add_argument("--fusion-mode", metavar="NAME", type=str, choices=["mean", "voting", "max"], default="mean",
-                        help="How to fuse the outputs. Options: 'mean', 'voting', 'max'")
     parser.add_argument("--output-mode", metavar="NAME", type=str, choices=["palette", "raw", "prob"],
                         default="final",
                         help="How the output files are formatted."
                         " -- palette: color coded predictions"
                         " -- raw: gray-scale predictions"
                         " -- prob: gray-scale predictions plus probabilities")
-    parser.add_argument("--scales", metavar="LIST", type=str,
-                        default="[0.7, 1, 1.2]", help="List of scales")
     # not sure uses below here yet
     parser.add_argument("--flip", action="store_true",
                         help="Use horizontal flipping")
@@ -48,10 +81,16 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # experiment setup
-    # check if output directory exists, if not, then make
-    # check if name is there, if not, then make
-    # create a logdir for tensorboard
-    # create all paths
+    out_path = args.out_dir
+    if not os.path.exists(out_path):
+        os.makedirs(args.out_dir)
+    experiment_path = os.path.join(out_path, args.name)
+    image_output_path = os.path.join(experiment_path, "out_images")
+    if not os.path.exists(experiment_path):
+        os.makedirs(experiment_path)
+        os.makedirs(image_output_path)
+    elif not os.path.exists(image_output_path):
+        os.makedirs(image_output_path)
 
     # Torch stuff
     torch.cuda.set_device(args.rank)
@@ -63,10 +102,11 @@ if __name__ == '__main__':
     model.cls.load_state_dict(cls_state)
     model = model.cuda().eval()
     print(model)
+    print('\n\n')
 
     # Create data loaders
     transformation = SegmentationTransform(
-        1024,
+        512,
         (0.41738699, 0.45732192, 0.46886091),
         (0.25685097, 0.26509955, 0.29067996),
     )
@@ -84,20 +124,52 @@ if __name__ == '__main__':
 
     # progress bar stuff
     scales = eval(args.scales)
+    dataset_confusion = np.zeros((65, 65), dtype=np.int32)
     with torch.no_grad():
-        for batch_i, data in enumerate(data_loader):
-            print(
-                "Testing batch [{:3d}/{:3d}]".format(batch_i + 1, len(data_loader)))
+        with tqdm(data_loader, desc="IOU") as t:
+            for batch_i, data in enumerate(t):
+                # print(
+                #     "Testing batch [{:3d}/{:3d}]".format(batch_i + 1, len(data_loader)))
 
-            # get the data
-            gt_img = data["gt_img"].cuda(non_blocking=True)
-            fake_img = data["fake_img"].cuda(non_blocking=True)
+                # get the data
+                gt_img = data["gt_img"].cuda(non_blocking=True)
+                fake_img = data["fake_img"].cuda(non_blocking=True)
 
-            # inference
-            gt_probs, gt_preds = model(gt_img, scales, args.flip)
-            fake_probs, fake_preds = model(fake_img, scales, args.flip)
+                # inference
+                gt_probs_img, gt_preds_img, gt_logits = model(
+                    gt_img, scales, args.flip)
+                fake_probs_img, fake_preds_img, fake_logits = model(
+                    fake_img, scales, args.flip)
 
-            # do IOU
-            # save images
+                # getting the classes
+                gt_probs = functional.softmax(gt_logits, dim=1)
+                _, gt_cls = gt_probs.squeeze().max(0)
+                gt_cls = gt_cls.data.cpu().numpy().reshape(-1)
+                fake_probs = functional.softmax(fake_logits, dim=1)
+                _, fake_cls = fake_probs.squeeze().max(0)
+                fake_cls = fake_cls.data.cpu().numpy().reshape(-1)
 
+                # construct confusion matrix
+                confusion = np.zeros((65, 65), dtype=np.int32)
+                for i in range(gt_cls.shape[0]):
+                    confusion[gt_cls[i], fake_cls[i]] += 1
+                dataset_confusion += confusion
+
+                # handling output images
+                save_palette_image(image_output_path,
+                                   gt_probs_img, gt_preds_img, data, gt=True)
+                save_palette_image(image_output_path,
+                                   fake_probs_img, fake_preds_img, data, gt=False)
+
+                # update tqdm
+                t.set_description("<IOU: %f>" %
+                                  confusion_to_iou(confusion))
+                t.refresh()
+
+    # find dataset iou
+    print("TEST DATASET IOU: {}".format(confusion_to_iou(dataset_confusion)))
+    # save images?
+    # TODO: only plot the relevant classes in the confusion matrix
+    plt.imshow(dataset_confusion)
+    plt.show()
     print("All done.")
