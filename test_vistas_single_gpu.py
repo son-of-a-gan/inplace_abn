@@ -17,9 +17,12 @@ from dataset.transform import SegmentationTransform
 from modules.bn import InPlaceABN
 from modules.deeplab import DeeplabV3
 
-parser = argparse.ArgumentParser(description="Testing script for the Vistas segmentation model")
-parser.add_argument("--scales", metavar="LIST", type=str, default="[0.7, 1, 1.2]", help="List of scales")
-parser.add_argument("--flip", action="store_true", help="Use horizontal flipping")
+parser = argparse.ArgumentParser(
+    description="Testing script for the Vistas segmentation model")
+parser.add_argument("--scales", metavar="LIST", type=str,
+                    default="[0.7, 1, 1.2]", help="List of scales")
+parser.add_argument("--flip", action="store_true",
+                    help="Use horizontal flipping")
 parser.add_argument("--fusion-mode", metavar="NAME", type=str, choices=["mean", "voting", "max"], default="mean",
                     help="How to fuse the outputs. Options: 'mean', 'voting', 'max'")
 parser.add_argument("--output-mode", metavar="NAME", type=str, choices=["palette", "raw", "prob"],
@@ -28,11 +31,15 @@ parser.add_argument("--output-mode", metavar="NAME", type=str, choices=["palette
                          " -- palette: color coded predictions"
                          " -- raw: gray-scale predictions"
                          " -- prob: gray-scale predictions plus probabilities")
-parser.add_argument("snapshot", metavar="SNAPSHOT_FILE", type=str, help="Snapshot file to load")
+parser.add_argument("snapshot", metavar="SNAPSHOT_FILE",
+                    type=str, help="Snapshot file to load")
 parser.add_argument("data", metavar="IN_DIR", type=str, help="Path to dataset")
-parser.add_argument("output", metavar="OUT_DIR", type=str, help="Path to output folder")
-parser.add_argument("--world-size", metavar="WS", type=int, default=1, help="Number of GPUs")
-parser.add_argument("--rank", metavar="RANK", type=int, default=0, help="GPU id")
+parser.add_argument("output", metavar="OUT_DIR", type=str,
+                    help="Path to output folder")
+parser.add_argument("--world-size", metavar="WS", type=int,
+                    default=1, help="Number of GPUs")
+parser.add_argument("--rank", metavar="RANK",
+                    type=int, default=0, help="GPU id")
 
 
 def flip(x, dim):
@@ -79,7 +86,8 @@ class SegmentationModule(nn.Module):
 
     class _MaxFusion:
         def __init__(self, x, _):
-            self.buffer_cls = x.new_zeros(x.size(0), x.size(2), x.size(3), dtype=torch.long)
+            self.buffer_cls = x.new_zeros(
+                x.size(0), x.size(2), x.size(3), dtype=torch.long)
             self.buffer_prob = x.new_zeros(x.size(0), x.size(2), x.size(3))
 
         def update(self, sem_logits):
@@ -128,14 +136,16 @@ class SegmentationModule(nn.Module):
         for scale in scales:
             # Main orientation
             sem_logits = self._network(x, scale)
-            sem_logits = functional.upsample(sem_logits, size=out_size, mode="bilinear")
+            sem_logits = functional.upsample(
+                sem_logits, size=out_size, mode="bilinear")
             fusion.update(sem_logits)
 
             # Flipped orientation
             if do_flip:
                 # Main orientation
                 sem_logits = self._network(flip(x, -1), scale)
-                sem_logits = functional.upsample(sem_logits, size=out_size, mode="bilinear")
+                sem_logits = functional.upsample(
+                    sem_logits, size=out_size, mode="bilinear")
                 fusion.update(flip(sem_logits, -1))
 
         return fusion.output()
@@ -177,7 +187,8 @@ def main():
     scales = eval(args.scales)
     with torch.no_grad():
         for batch_i, rec in enumerate(data_loader):
-            print("Testing batch [{:3d}/{:3d}]".format(batch_i + 1, len(data_loader)))
+            print(
+                "Testing batch [{:3d}/{:3d}]".format(batch_i + 1, len(data_loader)))
 
             img = rec["img"].cuda(non_blocking=True)
             probs, preds = model(img, scales, args.flip)
@@ -189,13 +200,15 @@ def main():
                 # Save prediction
                 prob = prob.cpu()
                 pred = pred.cpu()
-                pred_img = get_pred_image(pred, out_size, args.output_mode == "palette")
+                pred_img = get_pred_image(
+                    pred, out_size, args.output_mode == "palette")
                 pred_img.save(path.join(args.output, img_name + ".png"))
 
                 # Optionally save probabilities
                 if args.output_mode == "prob":
                     prob_img = get_prob_image(prob, out_size)
-                    prob_img.save(path.join(args.output, img_name + "_prob.png"))
+                    prob_img.save(
+                        path.join(args.output, img_name + "_prob.png"))
 
 
 def load_snapshot(snapshot_file):
@@ -204,7 +217,8 @@ def load_snapshot(snapshot_file):
 
     # Create network
     norm_act = partial(InPlaceABN, activation="leaky_relu", slope=.01)
-    body = models.__dict__["net_wider_resnet38_a2"](norm_act=norm_act, dilation=(1, 2, 4, 4))
+    body = models.__dict__["net_wider_resnet38_a2"](
+        norm_act=norm_act, dilation=(1, 2, 4, 4))
     head = DeeplabV3(4096, 256, 256, norm_act=norm_act, pooling_size=(84, 84))
 
     # Load snapshot and recover network state
@@ -280,7 +294,8 @@ _PALETTE = np.array([[165, 42, 42],
                      [0, 0, 192],
                      [32, 32, 32],
                      [120, 10, 10]], dtype=np.uint8)
-_PALETTE = np.concatenate([_PALETTE, np.zeros((256 - _PALETTE.shape[0], 3), dtype=np.uint8)], axis=0)
+_PALETTE = np.concatenate(
+    [_PALETTE, np.zeros((256 - _PALETTE.shape[0], 3), dtype=np.uint8)], axis=0)
 _PALETTE = ImagePalette.ImagePalette(
     palette=list(_PALETTE[:, 0]) + list(_PALETTE[:, 1]) + list(_PALETTE[:, 2]), mode="RGB")
 
