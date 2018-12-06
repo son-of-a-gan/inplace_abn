@@ -108,7 +108,8 @@ class SegmentationModule(nn.Module):
     def _network(self, x, scale):
         if scale != 1:
             scaled_size = [round(s * scale) for s in x.shape[-2:]]
-            x_up = functional.upsample(x, size=scaled_size, mode="bilinear")
+            x_up = functional.interpolate(
+                x, size=scaled_size, mode="bilinear", align_corners=False)
         else:
             x_up = x
 
@@ -126,16 +127,16 @@ class SegmentationModule(nn.Module):
         for scale in scales:
             # Main orientation
             sem_logits = self._network(x, scale)
-            sem_logits = functional.upsample(
-                sem_logits, size=out_size, mode="bilinear")
+            sem_logits = functional.interpolate(
+                sem_logits, size=out_size, mode="bilinear", align_corners=False)
             fusion.update(sem_logits)
 
             # Flipped orientation
             if do_flip:
                 # Main orientation
                 sem_logits = self._network(flip(x, -1), scale)
-                sem_logits = functional.upsample(
-                    sem_logits, size=out_size, mode="bilinear")
+                sem_logits = functional.interpolate(
+                    sem_logits, size=out_size, mode="bilinear", align_corners=False)
                 fusion.update(flip(sem_logits, -1))
 
         return fusion.output()

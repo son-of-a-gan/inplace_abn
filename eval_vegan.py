@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import argparse
+import tqdm
 
 from segmentation_module import SegmentationModule, load_snapshot, flip
 from torch.utils.data import DataLoader
@@ -35,9 +36,9 @@ if __name__ == '__main__':
                         " -- palette: color coded predictions"
                         " -- raw: gray-scale predictions"
                         " -- prob: gray-scale predictions plus probabilities")
-    # not sure uses below here yet
     parser.add_argument("--scales", metavar="LIST", type=str,
                         default="[0.7, 1, 1.2]", help="List of scales")
+    # not sure uses below here yet
     parser.add_argument("--flip", action="store_true",
                         help="Use horizontal flipping")
     parser.add_argument("--world-size", metavar="WS", type=int,
@@ -65,7 +66,7 @@ if __name__ == '__main__':
 
     # Create data loaders
     transformation = SegmentationTransform(
-        2048,
+        1024,
         (0.41738699, 0.45732192, 0.46886091),
         (0.25685097, 0.26509955, 0.29067996),
     )
@@ -81,5 +82,22 @@ if __name__ == '__main__':
         shuffle=False
     )
 
-    print(len(data_loader))
+    # progress bar stuff
+    scales = eval(args.scales)
+    with torch.no_grad():
+        for batch_i, data in enumerate(data_loader):
+            print(
+                "Testing batch [{:3d}/{:3d}]".format(batch_i + 1, len(data_loader)))
+
+            # get the data
+            gt_img = data["gt_img"].cuda(non_blocking=True)
+            fake_img = data["fake_img"].cuda(non_blocking=True)
+
+            # inference
+            gt_probs, gt_preds = model(gt_img, scales, args.flip)
+            fake_probs, fake_preds = model(fake_img, scales, args.flip)
+
+            # do IOU
+            # save images
+
     print("All done.")
