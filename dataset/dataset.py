@@ -10,11 +10,12 @@ from torch.utils.data import Dataset
 class VEGANSegmentationDataset(Dataset):
     _EXTENSIONS = ["*.jpg", "*.jpeg", "*.png"]
 
-    def __init__(self, gt_path, fake_path, transform):
+    def __init__(self, gt_path, fake_path, size_template_path, transform):
         super(VEGANSegmentationDataset, self).__init__()
 
         self.gt_path = gt_path
         self.fake_path = fake_path
+        self.size_template_path = size_template_path
         self.transform = transform
 
         # find all images in gt folder
@@ -26,7 +27,8 @@ class VEGANSegmentationDataset(Dataset):
             self.images.append({
                 "idx": idx,
                 "gt_path": img_path,
-                "fake_path": path.join(self.fake_path, name_with_ext)
+                "fake_path": path.join(self.fake_path, name_with_ext),
+                "size_template_path": path.join(self.size_template_path, name_with_ext)
             })
 
     def __len__(self):
@@ -37,6 +39,15 @@ class VEGANSegmentationDataset(Dataset):
         with Image.open(self.images[index]["gt_path"]) as gt_img_raw:
             # Load fake image
             fake_img_raw = Image.open(self.images[index]["fake_path"])
+            size_template_img = Image.open(
+                self.images[index]["size_template_path"])
+
+            required_size = size_template_img.size
+            gt_img_raw = gt_img_raw.resize(
+                required_size, resample=Image.BILINEAR)
+            fake_img_raw = fake_img_raw.resize(
+                required_size, resample=Image.BILINEAR)
+
             size = gt_img_raw.size
             gt_img = self.transform(gt_img_raw.convert(mode="RGB"))
             fake_img = self.transform(fake_img_raw.convert(mode="RGB"))

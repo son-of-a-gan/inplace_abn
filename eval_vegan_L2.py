@@ -58,6 +58,8 @@ if __name__ == '__main__':
                         help="Path to output folder.")
     parser.add_argument("--name", type=str, default="ganisgood",
                         help="Experiment folder name to be used in output folder.")
+    parser.add_argument("--size-templates", type=str, default="test_data",
+                        help="Folder of images where their sizes are what we want.")
     parser.add_argument("--fusion-mode", metavar="NAME", type=str, choices=["mean", "voting", "max", "iou_max"], default="iou_max",
                         help="How to fuse the outputs. Options: 'mean', 'voting', 'max', 'iou_max'")
     parser.add_argument("--scales", metavar="LIST", type=str,
@@ -111,7 +113,7 @@ if __name__ == '__main__':
         (0.25685097, 0.26509955, 0.29067996),
     )
     dataset = VEGANSegmentationDataset(
-        args.in_gt, args.in_fake, transformation)
+        args.in_gt, args.in_fake, args.size_templates, transformation)
     data_loader = DataLoader(
         dataset,
         batch_size=1,
@@ -128,6 +130,7 @@ if __name__ == '__main__':
     # progress bar stuff
     scales = eval(args.scales)
     dataset_confusion = np.zeros((65, 65), dtype=np.int32)
+    dataset_iou = 0
     with torch.no_grad():
         with tqdm(data_loader, desc="IOU") as t:
             for batch_i, data in enumerate(t):
@@ -174,12 +177,14 @@ if __name__ == '__main__':
                                    fake_probs_img, fake_preds_img, data, gt=False)
 
                 # update tqdm
-                t.set_description("<IOU: %f>" %
-                                  confusion_to_iou(confusion))
+                curr_iou = confusion_to_iou(confusion)
+                dataset_iou += curr_iou
+                t.set_description("<IOU: %f>" % curr_iou)
                 t.refresh()
 
     # find dataset iou
     print("TEST DATASET IOU: {}".format(confusion_to_iou(dataset_confusion)))
+    print("TEST DATASET AVG IOU: {}".format(dataset_iou/len(dataset)))
     print("TEST DATA MSE LOSS: {}".format(total_MSE_loss/len(dataset)))
 
     # save images?
